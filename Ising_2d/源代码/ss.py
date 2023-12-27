@@ -4,6 +4,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+from copy import deepcopy
 
 
 
@@ -29,13 +30,21 @@ def de_sigma(num_size):
 
     return sigma_list
 
+def gen_xy(num):   #create original list
+    s_list = []
+    for i in range(num):
+        sigma = np.random.rand(num)
+
+        s_list.append(sigma*2*3.14)
+    return s_list
 
 
 
 #apply cluster algri
 def choo_neigh_(sig1, sig2):
     #P0=max(sig1*sig2,0)*0  #无论如何翻转改了都很小，高温极限，不相关
-    P0=max(1-math.exp(-2*beta * J*sig1*sig2),0)
+    #P0=max(1-math.exp(-2*beta * J*sig1*sig2),0)
+    P0 = max(1-math.exp(-2*beta*J*np.cos(sig1-ref_angle)*np.cos(sig2-ref_angle)),0)
     #print('p0',P0,'SIGMA',sig1,'sig2',sig2)
     compare = np.random.random()
 
@@ -63,14 +72,26 @@ def get_tot_energy(sigma_list):
     for i in range(num_size):
         for j in range(num_size):
             site = find_four_bonds(i,j)
-            energy_site = sigma_list[i][j]*sigma_list[site[0][0]][site[0][1]]+\
-                          sigma_list[i][j]*sigma_list[site[1][0]][site[1][1]]+\
-                          sigma_list[i][j]*sigma_list[site[2][0]][site[2][1]]+\
-                          sigma_list[i][j]*sigma_list[site[3][0]][site[3][1]]
+            energy_site = np.cos(sigma_list[i][j]-sigma_list[site[0][0]][site[0][1]])+\
+                          np.cos(sigma_list[i][j]-sigma_list[site[1][0]][site[1][1]])+\
+                          np.cos(sigma_list[i][j]-sigma_list[site[2][0]][site[2][1]])+\
+                          np.cos(sigma_list[i][j]-sigma_list[site[3][0]][site[3][1]])
             E_lsit.append(energy_site)
             tot_energy = np.sum(E_lsit)/2
     return tot_energy
 
+def get_energy_config(sigma_list):
+    E_site = deepcopy(sigma_list)
+    for i in range(num_size):
+        for j in range(num_size):
+            site = find_four_bonds(i, j)
+            energy_site = np.cos(sigma_list[i][j] - sigma_list[site[0][0]][site[0][1]]) + \
+                          np.cos(sigma_list[i][j] - sigma_list[site[1][0]][site[1][1]]) + \
+                          np.cos(sigma_list[i][j] - sigma_list[site[2][0]][site[2][1]]) + \
+                          np.cos(sigma_list[i][j] - sigma_list[site[3][0]][site[3][1]])
+            E_site[i][j] = energy_site
+
+    return E_site
 
 def form_small_four_cluster(i,j,sigma_list, counted_list):  #输入格点，找四个bond，减去考虑过的, 再判断是否加入
     cluster_ready= find_four_bonds(i,j)    #找到这个格点附近的四个bond, 并在下一步减去之前考虑过的bond
@@ -119,7 +140,7 @@ def cal_ma_ideal(beta):
 
 
 
-beta_list = [0.03+0.02*i for i in range(30)]
+beta_list = [10+0.2*i for i in range(1)]
 xx_list = [0.001*i for i in range(600)]
 
 yy_list = []
@@ -131,54 +152,70 @@ for i in xx_list:
 
 
 
-num_list=[7,8,17]
+num_list=[40]
+x = np.arange(0,num_list[0],1)
+y = np.arange(0,num_list[0],1)
+
+xx, yy = np.meshgrid(x, y, sparse=True)
 J = 1
 for kk in num_list:
     num_size = kk
-    sigma_list=de_sigma(num_size)
+    sigma_list=gen_xy(num_size)     #generate new config
+    original = deepcopy(sigma_list)
+
     ulist=[]
     maglist = []
     cv_list = []
     #sus_list = []
     mean_energy_list = []
     for beta in beta_list:
-        steps= 10000
+        steps= 2000
         #print('beta', beta)
         mlist=[]
         EE_list = []
-
+        step_list =[]
         for j in range(steps):           #开始集团更新
             #print(j)
+            step_list.append(j)
 
             i0 = random.choice(range(num_size))
             j0 = random.choice(range(num_size))
 
+            ref_angle = 2*3.14159*random.random()     #random generating ref angle
+
             clusterlist = copy.copy(form_cluster(sigma_list,i0,j0))
-            value=copy.copy(sigma_list[i0][j0])
+
+            #value=copy.copy(sigma_list[i0][j0])
 
             for i in clusterlist:   #反转cluster中的每一个site
+                value = copy.copy(sigma_list[i[0]][i[1]])
                 #print('start',sigma_list[i[0]][i[1]])
-                sigma_list[i[0]][i[1]]=-value
-            #for i in sigma_list:
+                #sigma_list[i[0]][i[1]]=-value           # flip
+                sigma_list[i[0]][i[1]] = 3.14159-value+2*ref_angle
+                #for i in sigma_list:
                 #print('fliped',i)
                # print('end',sigma_list[i[0]][i[1]])
-            E_tot = get_tot_energy(sigma_list)
-            m=sum(np.array(sigma_list).flatten())
-            EE_list.append(E_tot)
-            mlist.append(abs(m))
-        mlist=mlist[5000:]
-        EE_list = EE_list[5000:]
+            #E_tot = get_tot_energy(sigma_list)
+
+            m=sum(np.cos(np.array(sigma_list).flatten()))
+            #EE_list.append(E_tot)
+            mlist.append(abs(m)/225)
+
+        #plt.plot(np.array(step_list),mlist, label = 'steps ')
+        mlist=mlist[100:]
+        #EE_list = EE_list[:]
+
         #print('end')
         #print(mlist)
         mag = np.mean(mlist)
-        mean_energy = np.mean(EE_list)
-        energy_suq_mean = np.mean([i*i for i in EE_list])
+        #mean_energy = np.mean(EE_list)
+        #energy_suq_mean = np.mean([i*i for i in EE_list])
 
 
         maglist.append(mag/kk**2)
         #print(maglist)
-        mean_energy_list.append(mean_energy)
-        cv_list.append(beta * beta * (energy_suq_mean - mean_energy ** 2))
+        #mean_energy_list.append(mean_energy)
+        #cv_list.append(beta * beta * (energy_suq_mean - mean_energy ** 2))
         #sus_list.append((energy_suq_mean - mean_energy ** 2)*beta)
 
 
@@ -190,8 +227,26 @@ for kk in num_list:
         u=1-(np.mean(magcube))/(3*(np.mean(magsqure))**2)
         ulist.append(u)
 
-    plt.plot(beta_list, ulist,'*', label = num_size)
-    plt.legend()
-    plt.xlabel('beta')
-    plt.ylabel('u')
+    #plt.plot(beta_list, cv_list,'*', label = num_size)
+    # plt.xlabel('beta')
+    # plt.ylabel('m')
+    fig, ax = plt.subplots(figsize=(4, 4))
+    fig2, ax2 = plt.subplots(figsize=(4, 4))
+    xx, yy = np.meshgrid(x, y, sparse=True)
+    u = np.cos(sigma_list)
+    v = np.sin(sigma_list)
+    #print('sig',u)
+    u1 = np.cos(original)
+    v1 = np.sin(original)
+    energy_config = get_energy_config(sigma_list)
+    angle_list = np.array(sigma_list)
+    plt.imshow(angle_list%6.28, cmap='viridis', interpolation='nearest', origin='upper')
+    cbar = plt.colorbar()
+
+    # 设置colorbar范围
+    cbar.mappable.set_clim(0,6.28)
+
+
+    #ax2.quiver(xx, yy, u1, v1, color = 'blue')
+    ax.quiver(xx, yy, u, v)
 plt.show()

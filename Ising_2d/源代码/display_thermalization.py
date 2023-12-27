@@ -181,7 +181,7 @@ for kk in num_list:
                # print('end',sigma_list[i[0]][i[1]])
             m=sum(np.array(sigma_list).flatten())
 
-            mlist.append(abs(m))
+            mlist.append(abs(m)/625)
         mlist=mlist[1:]
         #imageio.mimsave('a.gif',fig_list,fps = 4)
         #plt.show()

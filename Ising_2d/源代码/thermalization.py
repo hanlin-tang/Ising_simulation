@@ -100,7 +100,7 @@ def form_cluster(sigma_list,i0,j0):    #return cluster index list
 
 
 beta=0.4
-num_size=17
+num_size=12
 J = 1
 
 sigma_list=de_sigma(12)
